@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Task</string>
+
+    <string name="pcloud_key">fHU0kIy5tP0</string>
+
+    <!-- **** Errors **** -->
+    <string name="error_access_denied">You haven\'t access.</string>
+    <string name="text_empty_list">(No files in this folder)</string>
 </resources>
