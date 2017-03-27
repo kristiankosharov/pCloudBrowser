@@ -12,9 +12,9 @@ import pcloud.task.util.SharedPreferencesManager;
 
 public class FoldersModel {
 
-    public Call<RemoteFolder> getListFolder(Context context) {
+    public Call<RemoteFolder> getListFolder(Context context, long folderId) {
         return getApiClient(SharedPreferencesManager.getAccessToken(context))
-                .listFolder(RemoteFolder.ROOT_FOLDER_ID, true);
+                .listFolder(folderId);
     }
 
     private ApiClient getApiClient(String token) {

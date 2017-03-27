@@ -1,8 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.v7.widget.Toolbar xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/toolbar"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:minHeight="@dimen/abc_action_bar_default_height_material"
-    app:theme="@style/ThemeOverlay.AppCompat.ActionBar" />
+    android:layout_height="match_parent"
+    android:background="@android:color/holo_blue_dark"
+    android:contentInsetLeft="0dp"
+    android:contentInsetStart="0dp"
+    app:contentInsetEnd="0dp"
+    app:contentInsetStart="0dp"
+    android:gravity="center_vertical">
+
+    <ImageView
+        android:id="@+id/action_bar_image"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        app:srcCompat="@drawable/logo_pcloud" />
+
+    <TextView
+        android:id="@+id/action_bar_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:textColor="@android:color/white"
+        android:layout_toRightOf="@+id/action_bar_image"
+        android:text="@string/title_root" />
+
+    <ImageView
+        android:id="@+id/action_bar_back"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentRight="true"
+        app:srcCompat="@drawable/ic_arrow_up" />
+
+</RelativeLayout>

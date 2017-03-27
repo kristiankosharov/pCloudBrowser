@@ -4,5 +4,5 @@ import android.content.Context;
 
 public interface IMainPresenter {
 
-    void getFolders(Context context);
+    void getFolders(Context context, long folderId);
 }

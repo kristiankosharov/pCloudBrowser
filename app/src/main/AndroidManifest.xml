@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="pcloud.task">
+    package="pcloud.task" >
 
-    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
+        android:name=".ApplicationClass"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:name=".ApplicationClass"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
-        <activity android:name=".view.MainActivity">
+        android:theme="@style/Theme.AppCompat.Light.DarkActionBar"
+        tools:replace="android:theme" >
+        <activity android:name=".view.MainActivity" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import com.pcloud.sdk.RemoteEntry;
 import com.pcloud.sdk.RemoteFolder;
 
 import java.util.Date;
@@ -16,14 +17,17 @@ import pcloud.task.R;
 
 public class ListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
+    private static final String TAG = ListAdapter.class.getSimpleName();
     private Context mContext;
     private RemoteFolder mRemoteFolder;
     private static final int FILE_TYPE = 0;
     private static final int FOLDER_TYPE = 1;
+    private ListItemClickListener mItemClickListener;
 
-    public ListAdapter(Context context, RemoteFolder remoteFolder) {
+    public ListAdapter(Context context, RemoteFolder remoteFolder, ListItemClickListener listener) {
         mContext = context;
         mRemoteFolder = remoteFolder;
+        mItemClickListener = listener;
     }
 
     @Override
@@ -64,6 +68,16 @@ public class ListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     }
 
     @Override
+    public long getItemId(int position) {
+        RemoteEntry entry = mRemoteFolder.children().get(position);
+        if(getItemViewType(position) == FILE_TYPE) {
+            return entry.asFile().fileId();
+        } else {
+            return entry.asFolder().folderId();
+        }
+    }
+
+    @Override
     public int getItemViewType(int position) {
         if (mRemoteFolder.children().get(position).isFile()) {
             return FILE_TYPE;
@@ -83,6 +97,12 @@ public class ListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             mTxtFileName = (TextView) itemView.findViewById(R.id.txt_file_title);
             mTxtFileModTime = (TextView) itemView.findViewById(R.id.txt_file_mod_time);
             mTxtFileSize = (TextView) itemView.findViewById(R.id.txt_file_size);
+            itemView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    mItemClickListener.onClickFile(mRemoteFolder.children().get(getAdapterPosition()).asFile());
+                }
+            });
         }
     }
 
@@ -94,6 +114,15 @@ public class ListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             super(itemView);
 
             mTxtFolderName = (TextView) itemView.findViewById(R.id.txt_folder_title);
+            itemView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    RemoteFolder folder = mRemoteFolder.children().get(getAdapterPosition()).asFolder();
+                    long folderId = folder.folderId();
+                    long parentId = mRemoteFolder.parentFolderId();
+                    mItemClickListener.onClickFolder(folderId, parentId);
+                }
+            });
         }
     }
 

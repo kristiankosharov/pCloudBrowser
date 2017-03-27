@@ -6,4 +6,5 @@
     <!-- **** Errors **** -->
     <string name="error_access_denied">You haven\'t access.</string>
     <string name="text_empty_list">(No files in this folder)</string>
+    <string name="title_root">Root</string>
 </resources>

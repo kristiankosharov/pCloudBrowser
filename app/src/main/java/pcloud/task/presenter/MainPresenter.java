@@ -24,8 +24,8 @@ public class MainPresenter implements IMainPresenter {
     }
 
     @Override
-    public void getFolders(Context context) {
-        mFoldersModel.getListFolder(context)
+    public void getFolders(Context context, long folderId) {
+        mFoldersModel.getListFolder(context, folderId)
                 .enqueue(new Callback<RemoteFolder>() {
                     @Override
                     public void onResponse(Call<RemoteFolder> call, final RemoteFolder response) {
