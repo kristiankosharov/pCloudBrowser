@@ -1,8 +1,6 @@
 package pcloud.task.view;
 
 import android.app.Fragment;
-import android.content.Intent;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.widget.LinearLayoutManager;
@@ -12,44 +10,35 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import com.pcloud.sdk.DataSink;
 import com.pcloud.sdk.RemoteFile;
 import com.pcloud.sdk.RemoteFolder;
 
-import java.io.File;
-import java.io.IOException;
-
 import pcloud.task.R;
-import pcloud.task.util.BundleItem;
 
 public class ListFragment extends Fragment implements ListItemClickListener {
 
     public static final String TAG = ListFragment.class.getSimpleName();
 
+    private String mTitle;
     private RecyclerView mRecyclerView;
     private TextView mEmptyView;
-    private FileClickListener listItemClickListener;
+    private IFileClickListener listItemClickListener;
+    private RemoteFolder mCurrentFolder;
     private long parentId = -1;
 
     public static ListFragment newInstance() {
         return new ListFragment();
     }
 
-    public static ListFragment newInstance(BundleItem folder) {
-        ListFragment fragment = new ListFragment();
-        Bundle args = new Bundle();
-        args.putSerializable(BundleItem.BUNDLE_KEY, folder);
-        fragment.setArguments(args);
-        return fragment;
-    }
-
-    public void setClickListener(FileClickListener listener) {
+    public void setClickListener(IFileClickListener listener) {
         listItemClickListener = listener;
     }
 
     public void backPressed() {
         if (parentId != -1) {
-            listItemClickListener.onFolderClick(parentId);
+            listItemClickListener.onFolderClick(parentId, null);
+        } else if (parentId == 0) {
+            listItemClickListener.onFolderClick(RemoteFolder.ROOT_FOLDER_ID, getString(R.string.title_root));
         }
     }
 
@@ -62,22 +51,48 @@ public class ListFragment extends Fragment implements ListItemClickListener {
         mEmptyView = (TextView) view.findViewById(R.id.empty_view);
         mRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
 
-        if (getArguments() != null && getArguments().containsKey(BundleItem.BUNDLE_KEY)) {
-            BundleItem bundleItem = (BundleItem) getArguments().getSerializable(BundleItem.BUNDLE_KEY);
-            ListAdapter adapter = new ListAdapter(getActivity(), bundleItem.getRemoteFolder(), this);
-            mRecyclerView.setAdapter(adapter);
-            showEmptyView(bundleItem.getRemoteFolder());
-        }
         return view;
     }
 
-    protected void updateList(RemoteFolder remoteFolder) {
-        showEmptyView(remoteFolder);
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (mCurrentFolder != null) {
+            updateList();
+        }
+    }
 
-        boolean isEmpty = remoteFolder.children().isEmpty();
+    public void setRemoteFolder(RemoteFolder currentFolder) {
+        mCurrentFolder = currentFolder;
+    }
+
+    public void updateList(RemoteFolder folder) {
+        setRemoteFolder(folder);
+        updateList();
+    }
+
+    private void updateList() {
+        showEmptyView(mCurrentFolder);
+        setTitle(mCurrentFolder);
+        mRecyclerView.removeAllViewsInLayout();
+
+        boolean isEmpty = mCurrentFolder.children().isEmpty();
         if (!isEmpty) {
-            ListAdapter adapter = new ListAdapter(getActivity(), remoteFolder, this);
+            ListAdapter adapter = new ListAdapter(getActivity(), mCurrentFolder, this);
             mRecyclerView.setAdapter(adapter);
+            parentId = mCurrentFolder.parentFolderId();
+        }
+    }
+
+    protected String getTitle() {
+        return mTitle;
+    }
+
+    private void setTitle(RemoteFolder remoteFolder) {
+        if (remoteFolder.name().equals("/")) {
+            mTitle = getString(R.string.title_root);
+        } else {
+            mTitle = remoteFolder.name();
         }
     }
 
@@ -88,36 +103,12 @@ public class ListFragment extends Fragment implements ListItemClickListener {
 
     @Override
     public void onClickFile(RemoteFile file) {
-        new FileAsyncTask().execute(file);
+        listItemClickListener.onFileClick(file);
     }
 
     @Override
-    public void onClickFolder(long itemId, long parentId) {
+    public void onClickFolder(long itemId, long parentId, String folderName) {
         this.parentId = parentId;
-        listItemClickListener.onFolderClick(itemId);
-    }
-
-    // TODO Don't use async task. It's some fast implementation for downloading the file
-    // to open it
-    class FileAsyncTask extends AsyncTask<RemoteFile, Void, RemoteFile> {
-
-        @Override
-        protected RemoteFile doInBackground(RemoteFile... params) {
-            File filePath = new File(getActivity().getFilesDir(), "File");
-            try {
-                params[0].download(DataSink.create(filePath));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            return params[0];
-        }
-
-        @Override
-        protected void onPostExecute(RemoteFile aVoid) {
-            super.onPostExecute(aVoid);
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setType(aVoid.contentType());
-            getActivity().startActivity(Intent.createChooser(intent, "Choose..."));
-        }
+        listItemClickListener.onFolderClick(itemId, folderName);
     }
 }

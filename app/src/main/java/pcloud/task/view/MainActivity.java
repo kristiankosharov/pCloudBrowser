@@ -1,32 +1,35 @@
 package pcloud.task.view;
 
-import android.app.FragmentManager;
 import android.app.FragmentTransaction;
-import android.app.ProgressDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.res.Configuration;
+import android.net.Uri;
 import android.os.Bundle;
-import android.support.v7.app.ActionBar;
+import android.support.v4.app.ShareCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
+import android.support.v7.widget.Toolbar;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Toast;
 
 import com.pcloud.sdk.AuthorizationActivity;
 import com.pcloud.sdk.AuthorizationResult;
+import com.pcloud.sdk.RemoteFile;
 import com.pcloud.sdk.RemoteFolder;
 
 import pcloud.task.R;
 import pcloud.task.presenter.IMainPresenter;
 import pcloud.task.presenter.MainPresenter;
-import pcloud.task.util.BundleItem;
+import pcloud.task.util.NetworkUtil;
 import pcloud.task.util.SharedPreferencesManager;
 
-public class MainActivity extends AppCompatActivity implements IMainView, FileClickListener {
+public class MainActivity extends AppCompatActivity implements IMainView, IFileClickListener {
 
     private static final String TAG = MainActivity.class.getSimpleName();
     private static final int PCLOUD_AUTHORIZATION_REQUEST_CODE = 123;
+    private static final String PRESENTER_BUNDLE_KEY = "presenter";
     private IMainPresenter mPresenter;
     private RemoteFolder mCurrentFolder;
 
@@ -34,37 +37,24 @@ public class MainActivity extends AppCompatActivity implements IMainView, FileCl
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mPresenter = new MainPresenter(this);
-
-        View actionBar = LayoutInflater.from(this).inflate(R.layout.action_bar, null, false);
-        actionBar.findViewById(R.id.action_bar_back).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onBackPressed();
-            }
-        });
-        getSupportActionBar().setDisplayShowCustomEnabled(true);
-        getSupportActionBar().setDisplayOptions(ActionBar.DISPLAY_SHOW_CUSTOM);
-        getSupportActionBar().setCustomView(actionBar, new ActionBar.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-
-        if (savedInstanceState != null) {
-            // TODO load saved state
-            BundleItem bundleItem = (BundleItem) savedInstanceState.getSerializable(BundleItem.BUNDLE_KEY);
-            ListFragment listFragment = ListFragment.newInstance(bundleItem);
-            listFragment.setClickListener(this);
-            mCurrentFolder = bundleItem.getRemoteFolder();
-            Log.d(TAG, "onCreate: create ListFragment with: " + bundleItem.getRemoteFolder().name());
-            getFragmentManager().beginTransaction().replace(R.id.fragment_container, listFragment, ListFragment.TAG).commit();
-
-            return;
-        }
+        showToolbar();
 
         if (SharedPreferencesManager.getAccessToken(this) == null) {
             Intent authIntent = AuthorizationActivity.createIntent(MainActivity.this, getString(R.string.pcloud_key));
             startActivityForResult(authIntent, PCLOUD_AUTHORIZATION_REQUEST_CODE);
+            return;
+        }
+
+        if (savedInstanceState != null) {
+            ListFragment listFragment = (ListFragment) getFragmentManager().getFragment(savedInstanceState, ListFragment.TAG);
+            listFragment.setClickListener(this);
+            RemoteFolder folder = (RemoteFolder) getLastCustomNonConfigurationInstance();
+            mCurrentFolder = folder;
+            listFragment.setRemoteFolder(folder);
+            mPresenter = (IMainPresenter) savedInstanceState.getSerializable(PRESENTER_BUNDLE_KEY);
         } else {
-            showListFragment(-1);
+            mPresenter = new MainPresenter(this);
+            showListFragment();
         }
     }
 
@@ -76,7 +66,8 @@ public class MainActivity extends AppCompatActivity implements IMainView, FileCl
             if (result == AuthorizationResult.ACCESS_GRANTED) {
                 String accessToken = data.getExtras().getString(AuthorizationActivity.KEY_ACCESS_TOKEN);
                 SharedPreferencesManager.setAccessToken(MainActivity.this, accessToken);
-                showListFragment(-1);
+                mPresenter = new MainPresenter(this);
+                showListFragment();
             } else {
                 Toast.makeText(MainActivity.this, getString(R.string.error_access_denied), Toast.LENGTH_LONG).show();
             }
@@ -84,20 +75,57 @@ public class MainActivity extends AppCompatActivity implements IMainView, FileCl
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        if (mPresenter != null) {
+            mPresenter.onPause();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mPresenter != null) {
+            mPresenter.onResume(this);
+        }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_back) {
+            onBackPressed();
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
     public void onBackPressed() {
-        // TODO Handle exit from app (dialog)
         ListFragment listFragment = (ListFragment) getFragmentManager().findFragmentByTag(ListFragment.TAG);
         if (listFragment != null) {
-            listFragment.backPressed();
-        } else {
-            finish();
+            String title = listFragment.getTitle();
+            if (title != null && title.equals(getString(R.string.title_root))) {
+                showExitDialog();
+            } else {
+                listFragment.backPressed();
+            }
         }
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        outState.putSerializable(BundleItem.BUNDLE_KEY, new BundleItem(mCurrentFolder));
+        ListFragment listFragment = (ListFragment) getFragmentManager().findFragmentByTag(ListFragment.TAG);
+        if (listFragment != null) {
+            getFragmentManager().putFragment(outState, ListFragment.TAG, listFragment);
+        }
+        outState.putSerializable(PRESENTER_BUNDLE_KEY, mPresenter);
     }
 
     @Override
@@ -105,19 +133,23 @@ public class MainActivity extends AppCompatActivity implements IMainView, FileCl
         return mCurrentFolder;
     }
 
-    private void showListFragment(long folderId) {
-        FragmentManager fragmentManager = getFragmentManager();
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        ListFragment fragment = ListFragment.newInstance();
-        fragment.setClickListener(this);
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+    }
+
+    private void showListFragment() {
+        ListFragment fragment = (ListFragment) getFragmentManager().findFragmentByTag(ListFragment.TAG);
+        FragmentTransaction transaction = getFragmentManager().beginTransaction();
+        if (fragment == null) {
+            fragment = ListFragment.newInstance();
+            fragment.setClickListener(this);
+        }
+
         transaction.replace(R.id.fragment_container, fragment, ListFragment.TAG);
         transaction.commit();
-
-        //TODO Check permissions for internet
-        if (folderId == -1) {
-            mPresenter.getFolders(this, RemoteFolder.ROOT_FOLDER_ID);
-        } else {
-            mPresenter.getFolders(this, folderId);
+        if (checkForInternet()) {
+            mPresenter.getFolders(this, RemoteFolder.ROOT_FOLDER_ID, getString(R.string.title_root));
         }
     }
 
@@ -127,23 +159,83 @@ public class MainActivity extends AppCompatActivity implements IMainView, FileCl
         ListFragment listFragment = (ListFragment) getFragmentManager().findFragmentByTag(ListFragment.TAG);
         if (listFragment != null) {
             listFragment.updateList(folders);
+            getSupportActionBar().setTitle(listFragment.getTitle());
         }
     }
 
     @Override
-    public void showProgress() {
-        ProgressDialog dialog = new ProgressDialog(this);
-        dialog.setMessage("Loading ...'");
-        dialog.show();
+    public void openFile(Uri uri, String contentType) {
+        Intent intent = ShareCompat.IntentBuilder.from(this)
+                .setChooserTitle("Choose")
+                .createChooserIntent()
+                .setAction(Intent.ACTION_VIEW)
+                .setData(uri)
+                .setType(contentType)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+
+        if (intent.resolveActivityInfo(getPackageManager(), 0) != null) {
+            startActivity(intent);
+        } else {
+            Toast.makeText(MainActivity.this, getString(R.string.error_open_file), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public void showProgress(String message) {
+        ProgressDialogFragment fragment = ProgressDialogFragment.newInstance(message);
+        fragment.show(getFragmentManager(), ProgressDialogFragment.TAG);
     }
 
     @Override
     public void hideProgress() {
-
+        ProgressDialogFragment fragment = (ProgressDialogFragment) getFragmentManager().findFragmentByTag(ProgressDialogFragment.TAG);
+        if (fragment != null) {
+            fragment.dismiss();
+        }
     }
 
     @Override
-    public void onFolderClick(long itemId) {
-        mPresenter.getFolders(this, itemId);
+    public void onFolderClick(long itemId, String folderName) {
+        if (checkForInternet()) {
+            mPresenter.getFolders(this, itemId, folderName);
+        }
+    }
+
+    @Override
+    public void onFileClick(RemoteFile file) {
+        if (checkForInternet()) {
+            mPresenter.getFile(this, file);
+        }
+    }
+
+    private void showToolbar() {
+        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        toolbar.setLogo(R.drawable.logo_pcloud);
+        toolbar.setTitle(R.string.title_root);
+        setSupportActionBar(toolbar);
+    }
+
+    private void showExitDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Exit")
+                .setMessage(R.string.message_exit)
+                .setPositiveButton(R.string.action_yes, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        finish();
+                    }
+                })
+                .setNegativeButton(R.string.action_no, null)
+                .show();
+    }
+
+    private boolean checkForInternet() {
+        boolean result;
+        result = NetworkUtil.isConnected(this);
+        if (!result) {
+            Toast.makeText(MainActivity.this, getString(R.string.error_no_connection), Toast.LENGTH_LONG).show();
+        }
+        return result;
     }
 }

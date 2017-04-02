@@ -11,6 +11,7 @@ import android.widget.TextView;
 import com.pcloud.sdk.RemoteEntry;
 import com.pcloud.sdk.RemoteFolder;
 
+import java.text.DecimalFormat;
 import java.util.Date;
 
 import pcloud.task.R;
@@ -51,7 +52,7 @@ public class ListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             FileHolder fileHolder = (FileHolder) holder;
             fileHolder.mTxtFileName.setText(mRemoteFolder.children().get(position).name());
             long size = mRemoteFolder.children().get(position).asFile().size();
-            fileHolder.mTxtFileSize.setText(getMBSize(size));
+            fileHolder.mTxtFileSize.setText(getRightSize(size));
             Date date = mRemoteFolder.children().get(position).asFile().lastModified();
             String dat = DateFormat.format("dd.MM.dd hh:mm", date).toString();
 
@@ -70,7 +71,7 @@ public class ListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     @Override
     public long getItemId(int position) {
         RemoteEntry entry = mRemoteFolder.children().get(position);
-        if(getItemViewType(position) == FILE_TYPE) {
+        if (getItemViewType(position) == FILE_TYPE) {
             return entry.asFile().fileId();
         } else {
             return entry.asFolder().folderId();
@@ -119,15 +120,16 @@ public class ListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 public void onClick(View v) {
                     RemoteFolder folder = mRemoteFolder.children().get(getAdapterPosition()).asFolder();
                     long folderId = folder.folderId();
-                    long parentId = mRemoteFolder.parentFolderId();
-                    mItemClickListener.onClickFolder(folderId, parentId);
+                    long parentId = mRemoteFolder.children().get(getAdapterPosition()).parentFolderId();
+                    mItemClickListener.onClickFolder(folderId, parentId, folder.name());
                 }
             });
         }
     }
 
-    private String getMBSize(long size) {
-        int m = (int) (size / 1024.0);
-        return m + "Mb";
+    private String getRightSize(long size) {
+        final String[] units = new String[]{"B", "KB", "MB", "GB", "TB"};
+        int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
+        return new DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " " + units[digitGroups];
     }
 }

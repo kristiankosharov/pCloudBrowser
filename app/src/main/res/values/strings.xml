@@ -5,6 +5,14 @@
 
     <!-- **** Errors **** -->
     <string name="error_access_denied">You haven\'t access.</string>
+    <string name="error_open_file">Cannot open file.</string>
+    <string name="error_no_connection">No internet connection!</string>
+
     <string name="text_empty_list">(No files in this folder)</string>
     <string name="title_root">Root</string>
+    <string name="title_progress_open">Please wait! Open %s !</string>
+    <string name="message_parent_folder">parent folder!</string>
+    <string name="message_exit">Are you sure you want to exit from application?</string>
+    <string name="action_yes">Yes</string>
+    <string name="action_no">No</string>
 </resources>

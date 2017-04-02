@@ -4,5 +4,5 @@ import com.pcloud.sdk.RemoteFile;
 
 public interface ListItemClickListener {
     void onClickFile(RemoteFile file);
-    void onClickFolder(long itemId, long parentId);
+    void onClickFolder(long itemId, long parentId, String folderName);
 }
